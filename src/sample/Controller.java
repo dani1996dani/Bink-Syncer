@@ -1,15 +1,20 @@
 package sample;
 
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.fxml.FXML;
+import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 
 import java.awt.event.ActionEvent;
 import java.io.File;
+import java.net.URL;
+import java.util.ResourceBundle;
 
-public class Controller {
+public class Controller implements Initializable,Log {
 
     @FXML
     private Label rootLabel;
@@ -35,18 +40,68 @@ public class Controller {
     @FXML
     private Label progressLabel;
 
+    @FXML
+    private TextArea outputTextArea;
 
-    public void chooseRootFolder() {
-        System.out.println("hello from test");
+    StringBuilder outputString = new StringBuilder();
 
 
+    @Override
+    public void initialize(URL location, ResourceBundle resources) {
+        outputTextArea.textProperty().addListener(new ChangeListener<Object>() {
+            @Override
+            public void changed(ObservableValue<?> observable, Object oldValue,
+                                Object newValue) {
+                outputTextArea.setScrollTop(Double.MAX_VALUE); //this will scroll to the bottom
+                //use Double.MIN_VALUE to scroll to the top
+            }
+        });
+
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread t, Throwable e) {
+                error(e.getMessage());
+            }
+        });
+
+    }
+
+    @Override
+    public void log(String s){
+        Platform.runLater(() -> {
+            outputTextArea.appendText(s + '\n');
+        });
+    }
+
+    @Override
+    public void error(String s){
+
+        outputTextArea.appendText("EXCEPTION:" +  '\n');
+        outputTextArea.appendText(s + '\n');
+        outputTextArea.appendText("END EXCEPTION"+ '\n');
+
+    }
+
+//    public void log(String s){
+//        Platform.runLater(() -> {
+//
+//            outputTextArea.appendText(s + '\n');
+//        });
+//    }
+
+
+    public void chooseRootFolder() throws Exception {
         DirectoryChooser fileChooser = new DirectoryChooser();
         File selectedFile = fileChooser.showDialog(null);
 
         if (selectedFile != null) {
-            System.out.println(selectedFile.getPath());
+
+            log("Root Dir: " + selectedFile.getPath());
+            //System.out.println(selectedFile.getPath());
             rootLabel.setText(selectedFile.getAbsolutePath());
         }
+
+
     }
 
     public void chooseTargetFolder() {
@@ -54,6 +109,7 @@ public class Controller {
         File selectedFile = fileChooser.showDialog(null);
 
         if (selectedFile != null) {
+            log("Target Dir: " + selectedFile.getPath());
             targetLabel.setText(selectedFile.getAbsolutePath());
         }
     }
@@ -75,6 +131,7 @@ public class Controller {
     }
 
     public void sync() {
+
         System.out.println("syncing");
         boolean keepFiles = keepTargetFiles.isSelected();
         String rootString = rootLabel.getText();
@@ -85,13 +142,15 @@ public class Controller {
         disableUI();
 
         Syncer syncer = Syncer.getInstance();
+        syncer.setLogger(this);
 
 
         new Thread(new Runnable() {
             @Override
             public void run() {
                 syncer.sync(rootString, targetString, keepFiles);
-                System.out.println("finished syncing");
+                log("Finished Syncing");
+                //System.out.println("finished syncing");
                 Platform.runLater(new Runnable() {
                     @Override
                     public void run() {
@@ -115,10 +174,13 @@ public class Controller {
                         Thread.sleep(200);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
+                        log(e.getMessage());
                     }
                     double progress = syncer.getCurrentProccess();
                     int progressPercent = (int)(progress * 100);
+                    System.out.println("Calc");
                     System.out.println(progress);
+                    System.out.println("End Calc");
                     Platform.runLater(new Runnable() {
                         @Override
                         public void run() {
@@ -133,6 +195,7 @@ public class Controller {
 
 
     }
+
 
 
 }

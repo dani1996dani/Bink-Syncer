@@ -16,6 +16,14 @@ public class Syncer {
     private long bytesProcessed = 0;
     private long totalBytesToProcess = 0;
 
+    private Log logger;
+
+    public static final String seperatorLine = "\n===========================\n";
+
+    public void setLogger(Log logger){
+        this.logger = logger;
+    }
+
 
     public static Syncer getInstance() {
         return ourInstance;
@@ -30,7 +38,10 @@ public class Syncer {
 
 
     public double getCurrentProccess() {
-        return (double) (bytesProcessed) / (double) totalBytesToProcess;
+        double current = (double) (bytesProcessed) / (double) totalBytesToProcess;
+        if(Double.isNaN(current))
+            current = 0;
+        return current;
     }
 
     public void sync(String rootString, String targetString, boolean keepTargetFiles) {
@@ -53,7 +64,7 @@ public class Syncer {
 
             copyFilesToTarget(rootPath, rootString, targetString);
         } catch (IOException e) {
-
+            logger.log(e.getMessage());
         } finally {
             resetSyncerState();
         }
@@ -69,6 +80,9 @@ public class Syncer {
 
 
     private void copyFilesToTarget(Path rootPath, String rootString, String targetString) throws IOException {
+
+        logger.log(seperatorLine + "Copying phase - Searching for files to copy.");
+
         Files.walkFileTree(rootPath, new FileVisitor<Path>() {
 
 
@@ -78,21 +92,27 @@ public class Syncer {
                 if (relativeRootString.isEmpty()) {
                     return FileVisitResult.CONTINUE;
                 }
-                System.out.println(relativeRootString);
+                logger.log(seperatorLine);
+                logger.log("Evaluating Dir: " + relativeRootString);
                 File currentDir = dir.toFile();
                 File targetDir = new File(targetString + relativeRootString);
 
                 long currFolderSize = FileUtils.sizeOfDirectory(dir.toFile());
 
+
                 if (targetDir.exists()) {
-                    System.out.println("exists");
+                    logger.log("Target Dir exists.");
                 } else {
-                    System.out.println("not exists");
+                    logger.log("Target Dir doesn't exist.");
+                    logger.log("Copying " + targetDir.getPath().toString());
                     FileUtils.copyDirectory(currentDir, targetDir);
                     bytesProcessed += currFolderSize;
+                    logger.log("Finished Copying.");
+                    logger.log(seperatorLine);
                     return FileVisitResult.SKIP_SUBTREE;
                 }
-                System.out.println("=========================");
+
+
 
 
                 return FileVisitResult.CONTINUE;
@@ -102,7 +122,8 @@ public class Syncer {
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
 
                 String relativeFileString = file.toString().substring(rootString.length());
-                System.out.println(relativeFileString);
+                logger.log("\n");
+                logger.log("Evaluating File: " + relativeFileString);
                 if (relativeFileString.isEmpty()) {
                     return FileVisitResult.CONTINUE;
                 }
@@ -113,10 +134,14 @@ public class Syncer {
                 File currFile = file.toFile();
                 File targetFile = new File(targetString + relativeFileString);
                 if (targetFile.exists()) {
-                    System.out.println("File exists");
+                    logger.log("File exists.");
+                    logger.log("\n");
                 } else {
-                    System.out.println("File not exists");
+                    logger.log("File doesn't exist.");
+                    logger.log("Copying " + targetFile.getPath().toString());
                     FileUtils.copyFile(currFile, targetFile);
+                    logger.log("Finished Copying " + targetFile.getPath().toString());
+                    logger.log("\n");
                     return FileVisitResult.SKIP_SUBTREE;
                 }
 
@@ -137,7 +162,7 @@ public class Syncer {
 
 
     private void deleteUnknownFilesInTarget(String rootString, String targetString, File targetDir) throws IOException {
-        System.out.println(" ================> Checking to delete");
+         logger.log(seperatorLine + " Checking to delete");
 
         Files.walkFileTree(targetDir.toPath(), new FileVisitor<Path>() {
             @Override
@@ -146,25 +171,27 @@ public class Syncer {
                 if (relativeTargetString.isEmpty()) {
                     return FileVisitResult.CONTINUE;
                 }
-                System.out.println(relativeTargetString);
+                logger.log(relativeTargetString);
                 File currentDir = dir.toFile();
                 File rootDir = new File(rootString + relativeTargetString);
 
                 if (rootDir.exists()) {
-                    System.out.println("exists");
+                    logger.log("Root Dir exists.");
                 } else {
-                    System.out.println("not exists");
+
+                    logger.log("Root Dir doesn't exist.");
                     FileUtils.deleteDirectory(currentDir);
                     return FileVisitResult.SKIP_SUBTREE;
                 }
-                System.out.println("=========================");
+                logger.log(seperatorLine);
+                //System.out.println("=========================");
                 return FileVisitResult.CONTINUE;
             }
 
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                 String relativeFileString = file.toString().substring(targetString.length());
-                System.out.println(relativeFileString);
+                logger.log(relativeFileString);
                 if (relativeFileString.isEmpty()) {
                     return FileVisitResult.CONTINUE;
                 }
@@ -172,9 +199,11 @@ public class Syncer {
                 File currFile = file.toFile();
                 File rootFile = new File(rootString + relativeFileString);
                 if (rootFile.exists()) {
-                    System.out.println("File exists");
+                    //System.out.println("File exists");
+                    logger.log("File exists.");
                 } else {
-                    System.out.println("File not exists");
+                    logger.log("File doesn't exist.");
+                    //System.out.println("File not exists");
                     currFile.delete();
                     return FileVisitResult.SKIP_SUBTREE;
                 }
